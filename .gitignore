@@ -1,0 +1,26 @@
+node_modules/
+
+# ── Secrets ──────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Real guest data — never commit ───────────────────────────────────────────
+data/
+
+# ── Real client content — never commit ───────────────────────────────────────
+# Only *.example.md / *.example.txt are tracked. Everything else in these two
+# folders is live client content (property details, staff names, house rules)
+# and stays on this machine. See README → "Configuring your properties".
+knowledge_base/*
+!knowledge_base/*.example.md
+
+prompts/router-prompt.txt
+prompts/system-prompt.txt
+
+# ── OS / editor cruft ────────────────────────────────────────────────────────
+.DS_Store
+*.log
+npm-debug.log*
+uploads/
+tmp/

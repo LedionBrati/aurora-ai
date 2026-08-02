@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aurora AI — Unified Inbox</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:             #f7f4ef;
+      --surface:        #ffffff;
+      --surface-2:      #faf8f4;
+      --surface-3:      #ebf3fd;
+      --border:         #e6e0d4;
+      --border-hover:   #c9c2b4;
+      --text:           #18293f;
+      --text-secondary: #4e6070;
+      --text-muted:     #9daab5;
+      --aegean:         #1664b0;
+      --aegean-2:       #0d509a;
+      --aegean-hover:   #125299;
+      --aegean-light:   #ebf3fd;
+      --aegean-dim:     rgba(22, 100, 176, 0.08);
+      --aegean-dashed:  rgba(22, 100, 176, 0.28);
+      --terracotta:     #c4714f;
+      --sand:           #f5e8d0;
+      --wa-color:       #14854a;
+      --wa-bg:          rgba(20, 133, 74, 0.09);
+      --email-color:    #1664b0;
+      --email-bg:       rgba(22, 100, 176, 0.09);
+      --danger:         #c0392b;
+      --danger-bg:      rgba(192, 57, 43, 0.07);
+      --shadow-sm:      0 1px 3px rgba(24,41,63,0.06), 0 1px 2px rgba(24,41,63,0.04);
+      --shadow-bubble:  0 2px 14px rgba(24,41,63,0.07), 0 1px 4px rgba(24,41,63,0.04);
+      --shadow-float:   0 8px 32px rgba(24,41,63,0.1), 0 2px 8px rgba(24,41,63,0.06);
+      --shadow-header:  0 4px 24px rgba(24,41,63,0.07), 0 1px 0 rgba(24,41,63,0.05);
+      --radius:         14px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Ambient background gradient — warm stucco to cool sea-light */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 80% 5%,  rgba(22,100,176,0.07) 0%, transparent 55%),
+        radial-gradient(ellipse at 5%  90%, rgba(196,113,79,0.06) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Header — glassmorphic ──────────────── */
+    header {
+      flex-shrink: 0;
+      position: relative;
+      z-index: 100;
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(22px) saturate(1.6);
+      -webkit-backdrop-filter: blur(22px) saturate(1.6);
+      border-bottom: 1px solid rgba(230, 224, 212, 0.7);
+      box-shadow: var(--shadow-header);
+      padding: 0 28px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .brand-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }
+
+    .brand-name em {
+      font-style: italic;
+      background: linear-gradient(130deg, #1664b0 0%, #22a0e8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .brand-divider { width: 1px; height: 14px; background: var(--border); }
+
+    .brand-sub {
+      font-size: 10px;
+      font-weight: 400;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    #conv-count {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    #conv-count strong { color: var(--aegean); font-weight: 600; }
+
+    .btn-link {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: rgba(255,255,255,0.7);
+      border: 1px solid var(--border);
+      padding: 5px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      text-decoration: none;
+      letter-spacing: 0.02em;
+      transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+    .btn-link:hover {
+      border-color: var(--aegean);
+      color: var(--aegean);
+      background: var(--aegean-light);
+      box-shadow: 0 2px 8px rgba(22,100,176,0.12);
+    }
+
+    /* ── Inbox layout ───────────────────────── */
+    .inbox-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Left panel ─────────────────────────── */
+    .conv-panel {
+      width: 308px;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.94);
+      border-right: 1px solid rgba(230,224,212,0.8);
+      box-shadow: 2px 0 16px rgba(24,41,63,0.04);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .filter-bar {
+      flex-shrink: 0;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 4px;
+      background: transparent;
+    }
+
+    .tab {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      color: var(--text-secondary);
+      background: transparent;
+      letter-spacing: 0.03em;
+      transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+    .tab:hover { background: var(--aegean-light); color: var(--aegean); }
+    .tab.active {
+      background: var(--aegean-light);
+      color: var(--aegean);
+      font-weight: 600;
+      box-shadow: inset 0 0 0 1px rgba(22,100,176,0.15);
+    }
+
+    .conv-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .conv-list::-webkit-scrollbar { width: 3px; }
+    .conv-list::-webkit-scrollbar-track { background: transparent; }
+    .conv-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .conv-item {
+      padding: 13px 16px;
+      border-bottom: 1px solid rgba(230,224,212,0.6);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
+    }
+    .conv-item:hover {
+      background: rgba(235,243,253,0.5);
+      transform: translateX(2px);
+    }
+    .conv-item.active {
+      background: var(--aegean-light);
+      border-left: 3px solid var(--aegean);
+      padding-left: 13px;
+      box-shadow: inset 2px 0 0 var(--aegean), 2px 0 12px rgba(22,100,176,0.05);
+    }
+
+    .conv-item-top {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 5px;
+    }
+
+    .channel-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+    .channel-badge.whatsapp { background: var(--wa-bg);    color: var(--wa-color);    }
+    .channel-badge.email    { background: var(--email-bg); color: var(--email-color); }
+
+    .conv-name {
+      font-size: 12.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      color: var(--text);
+      letter-spacing: 0.01em;
+    }
+
+    .conv-time {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .conv-item-bottom {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .conv-preview {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .draft-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--aegean);
+      flex-shrink: 0;
+      box-shadow: 0 0 0 2px rgba(22,100,176,0.2);
+    }
+
+    .prop-chip {
+      font-family: 'DM Mono', monospace;
+      font-size: 8px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    /* Property chips are assigned a tone by slug hash — no property is hardcoded,
+       so adding a property to knowledge_base/ needs no change here. */
+    .prop-chip.tone-1  { background: rgba(20,133,74,0.09);  color: #14854a; }
+    .prop-chip.tone-2  { background: rgba(22,100,176,0.09); color: #1664b0; }
+    .prop-chip.tone-3  { background: rgba(109,63,176,0.09); color: #6d3fb0; }
+    .prop-chip.tone-4  { background: rgba(154,91,13,0.10);  color: #8a520c; }
+    .prop-chip.unknown { background: rgba(78,96,112,0.09);  color: #4e6070; }
+
+    .resolved-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 8px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+
+    .conv-empty {
+      padding: 52px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    /* ── Right panel — thread ───────────────── */
+    .thread-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Empty state */
+    .thread-empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+    .thread-empty-glyph {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 44px;
+      font-weight: 400;
+      line-height: 1;
+      color: #d8d0c4;
+    }
+    .thread-empty-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      letter-spacing: 0.03em;
+    }
+
+    /* Thread view */
+    .thread-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .thread-header {
+      flex-shrink: 0;
+      padding: 13px 24px;
+      background: rgba(255,255,255,0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(230,224,212,0.7);
+      box-shadow: 0 2px 12px rgba(24,41,63,0.05);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .thread-guest {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .thread-guest-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 20px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+      letter-spacing: 0.01em;
+    }
+
+    .thread-identifier {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .thread-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    .btn-sm {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      background: rgba(255,255,255,0.7);
+      color: var(--text-secondary);
+      letter-spacing: 0.02em;
+      transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+    .btn-sm:hover {
+      border-color: var(--aegean);
+      color: var(--aegean);
+      background: var(--aegean-light);
+      box-shadow: 0 2px 8px rgba(22,100,176,0.1);
+    }
+    .btn-sm.resolved { color: var(--wa-color); border-color: rgba(20,133,74,0.3); }
+    .btn-sm.resolved:hover { background: rgba(20,133,74,0.07); box-shadow: none; }
+
+    /* Messages area */
+    .messages-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .messages-area::-webkit-scrollbar { width: 3px; }
+    .messages-area::-webkit-scrollbar-track { background: transparent; }
+    .messages-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Message bubbles */
+    .msg-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .msg-row.inbound  { justify-content: flex-start; }
+    .msg-row.outbound { justify-content: flex-end; }
+    .msg-row.draft    { justify-content: flex-end; }
+
+    .msg-bubble {
+      max-width: 66%;
+      padding: 12px 17px;
+      border-radius: 20px;
+      font-size: 13.5px;
+      line-height: 1.68;
+      white-space: pre-wrap;
+      word-break: break-word;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .msg-bubble:hover { transform: translateY(-1px); }
+
+    .msg-row.inbound .msg-bubble {
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(230,224,212,0.8);
+      border-bottom-left-radius: 5px;
+      color: var(--text);
+      box-shadow: var(--shadow-bubble);
+    }
+    .msg-row.inbound .msg-bubble:hover {
+      box-shadow: 0 4px 20px rgba(24,41,63,0.1), 0 2px 6px rgba(24,41,63,0.06);
+    }
+
+    .msg-row.outbound .msg-bubble {
+      background: linear-gradient(145deg, #1a6db8 0%, #0d509a 100%);
+      border: none;
+      border-bottom-right-radius: 5px;
+      color: #ffffff;
+      box-shadow: 0 4px 16px rgba(22,100,176,0.3), 0 1px 4px rgba(22,100,176,0.2);
+    }
+    .msg-row.outbound .msg-bubble:hover {
+      box-shadow: 0 6px 24px rgba(22,100,176,0.38), 0 2px 8px rgba(22,100,176,0.22);
+    }
+
+    .msg-row.draft .msg-bubble {
+      background: rgba(245,232,208,0.7);
+      border: 1.5px dashed rgba(22,100,176,0.28);
+      border-bottom-right-radius: 5px;
+      color: #6b5f4a;
+      box-shadow: 0 2px 10px rgba(196,113,79,0.08);
+    }
+
+    .draft-label {
+      display: inline-block;
+      font-family: 'DM Mono', monospace;
+      font-size: 8.5px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--aegean);
+      margin-bottom: 7px;
+      opacity: 0.9;
+    }
+
+    .msg-meta {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-top: 5px;
+      white-space: nowrap;
+    }
+    .msg-row.inbound  .msg-meta { text-align: left;  }
+    .msg-row.outbound .msg-meta { text-align: right; }
+    .msg-row.draft    .msg-meta { text-align: right; }
+
+    .msg-col {
+      display: flex;
+      flex-direction: column;
+    }
+    .msg-row.inbound  .msg-col { align-items: flex-start; }
+    .msg-row.outbound .msg-col { align-items: flex-end; }
+    .msg-row.draft    .msg-col { align-items: flex-end; }
+
+    /* Date divider */
+    .date-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 6px 0;
+    }
+    .date-divider::before,
+    .date-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+    }
+    .date-divider span {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+
+    /* ── Composer ───────────────────────────── */
+    .composer {
+      flex-shrink: 0;
+      padding: 16px 24px;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(230,224,212,0.7);
+      box-shadow: 0 -4px 20px rgba(24,41,63,0.06);
+    }
+
+    .composer-input {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 13px 18px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13.5px;
+      color: var(--text);
+      resize: none;
+      min-height: 78px;
+      max-height: 200px;
+      outline: none;
+      line-height: 1.65;
+      letter-spacing: 0.01em;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .composer-input::placeholder { color: var(--text-muted); }
+    .composer-input:focus {
+      border-color: var(--aegean);
+      background: #ffffff;
+      box-shadow: 0 0 0 4px rgba(22,100,176,0.09), 0 2px 12px rgba(22,100,176,0.07);
+    }
+
+    .composer-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      gap: 8px;
+    }
+
+    .composer-left { display: flex; gap: 8px; align-items: center; }
+
+    .composer-hint {
+      font-family: 'DM Mono', monospace;
+      font-size: 9.5px;
+      color: var(--text-muted);
+      letter-spacing: 0.03em;
+    }
+
+    button {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 8px 18px;
+      border: none;
+      border-radius: 22px;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+    button:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
+
+    .btn-send {
+      background: linear-gradient(135deg, #1a6db8 0%, #0d509a 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 16px rgba(22,100,176,0.32), 0 1px 4px rgba(22,100,176,0.2);
+      padding: 8px 22px;
+    }
+    .btn-send:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(22,100,176,0.4), 0 2px 8px rgba(22,100,176,0.24);
+    }
+    .btn-send:active:not(:disabled) { transform: translateY(0); }
+
+    .btn-discard-draft {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      font-size: 11.5px;
+      padding: 7px 14px;
+      border-radius: 20px;
+    }
+    .btn-discard-draft:hover:not(:disabled) {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border-color: rgba(192,57,43,0.22);
+      transform: none;
+    }
+
+    /* ── Toast ──────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(230,224,212,0.8);
+      color: var(--text);
+      padding: 11px 18px;
+      border-radius: 14px;
+      font-size: 13px;
+      box-shadow: var(--shadow-float);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px) scale(0.97);
+      transition: opacity 0.22s, transform 0.22s cubic-bezier(0.4,0,0.2,1);
+      z-index: 200;
+      letter-spacing: 0.01em;
+    }
+    #toast.show { opacity: 1; transform: translateY(0) scale(1); }
+    #toast.error { border-color: rgba(192,57,43,0.28); color: var(--danger); }
+
+    /* ── Media messages ─────────────────────── */
+    .msg-img {
+      display: block;
+      max-width: 260px;
+      max-height: 200px;
+      border-radius: 12px;
+      object-fit: cover;
+      cursor: zoom-in;
+      margin-bottom: 2px;
+    }
+    .msg-video {
+      display: block;
+      max-width: 280px;
+      max-height: 200px;
+      border-radius: 12px;
+      margin-bottom: 2px;
+    }
+    .msg-audio {
+      display: block;
+      width: 240px;
+      margin-bottom: 2px;
+    }
+    .msg-file-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: rgba(24,41,63,0.05);
+      border-radius: 12px;
+      min-width: 200px;
+      max-width: 280px;
+      margin-bottom: 2px;
+    }
+    .msg-row.outbound .msg-file-card { background: rgba(255,255,255,0.15); }
+    .msg-file-icon { flex-shrink: 0; color: var(--text-secondary); }
+    .msg-row.outbound .msg-file-icon { color: rgba(255,255,255,0.75); }
+    .msg-file-info { flex: 1; min-width: 0; }
+    .msg-file-name {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .msg-file-size {
+      font-family: 'DM Mono', monospace;
+      font-size: 9.5px;
+      color: var(--text-muted);
+    }
+    .msg-row.outbound .msg-file-name { color: rgba(255,255,255,0.95); }
+    .msg-row.outbound .msg-file-size { color: rgba(255,255,255,0.6);  }
+    .msg-file-dl {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--aegean-light);
+      color: var(--aegean);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      font-size: 13px;
+      transition: background 0.15s;
+    }
+    .msg-file-dl:hover { background: rgba(22,100,176,0.18); }
+    .msg-row.outbound .msg-file-dl { background: rgba(255,255,255,0.2); color: #fff; }
+    .msg-row.outbound .msg-file-dl:hover { background: rgba(255,255,255,0.3); }
+    .msg-caption {
+      font-size: 13px;
+      margin-top: 6px;
+      line-height: 1.55;
+    }
+
+    /* ── Email body rendering ───────────────── */
+    .msg-bubble-email {
+      padding: 0;
+      overflow: hidden;
+      max-width: 540px;
+    }
+    .email-frame {
+      display: block;
+      width: 100%;
+      min-height: 32px;
+      border: none;
+      border-radius: inherit;
+    }
+    .msg-plain-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg-row.inbound  .msg-plain-text a { color: var(--aegean); text-decoration: underline; }
+    .msg-row.outbound .msg-plain-text a { color: rgba(255,255,255,0.92); text-decoration: underline; }
+    .msg-row.draft    .msg-plain-text a { color: var(--aegean); }
+
+    /* ── Lightbox ────────────────────────────── */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(10,16,24,0.88);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+      cursor: pointer;
+      padding: 24px;
+    }
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 10px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      cursor: default;
+    }
+    .lightbox-close {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      background: rgba(255,255,255,0.12);
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .lightbox-close:hover { background: rgba(255,255,255,0.22); }
+
+    /* ── Attach button ───────────────────────── */
+    .btn-attach {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.7);
+      color: var(--text-secondary);
+      cursor: pointer;
+      flex-shrink: 0;
+      padding: 0;
+      transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+    .btn-attach:hover {
+      border-color: var(--aegean);
+      color: var(--aegean);
+      background: var(--aegean-light);
+    }
+    .btn-attach.uploading {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* ── Attachment preview strip ────────────── */
+    .attach-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+    .attach-preview-inner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+    .attach-thumb {
+      width: 40px;
+      height: 40px;
+      border-radius: 7px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .attach-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 7px;
+      background: var(--aegean-light);
+      color: var(--aegean);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .attach-meta { min-width: 0; }
+    .attach-name {
+      font-size: 12.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+      color: var(--text);
+    }
+    .attach-size {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .attach-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 17px;
+      line-height: 1;
+      padding: 2px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: color 0.15s, background 0.15s;
+    }
+    .attach-remove:hover { color: var(--danger); background: var(--danger-bg); }
+
+    /* ── New-message badge ──────────────────── */
+    .new-msg-badge {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: var(--aegean);
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      padding: 7px 18px;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(22,100,176,0.35);
+      animation: badge-pop 0.2s cubic-bezier(0.4,0,0.2,1);
+      white-space: nowrap;
+    }
+    .new-msg-badge:hover {
+      background: var(--aegean-hover);
+      transform: translateX(-50%) translateY(-1px);
+      box-shadow: 0 6px 20px rgba(22,100,176,0.42);
+    }
+    @keyframes badge-pop {
+      from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.95); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1);    }
+    }
+
+    /* ── Back button (mobile only) ──────────── */
+    .btn-back {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.85);
+      color: var(--text-secondary);
+      cursor: pointer;
+      flex-shrink: 0;
+      padding: 0;
+      transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+    .btn-back:hover, .btn-back:active {
+      border-color: var(--aegean);
+      color: var(--aegean);
+      background: var(--aegean-light);
+    }
+
+    /* ──────────────────────────────────────── */
+    /* ── Mobile responsive (≤ 768px) ────────  */
+    /* ──────────────────────────────────────── */
+    @media (max-width: 768px) {
+      html, body {
+        height: 100%;
+        height: 100dvh;
+      }
+
+      header {
+        padding: 0 16px;
+        height: 54px;
+      }
+      .brand-name { font-size: 19px; }
+      .brand-divider, .brand-sub { display: none; }
+      #conv-count { display: none; }
+      .btn-link { padding: 5px 12px; font-size: 10.5px; }
+
+      /* Stack panels — list shown by default, thread slides in on selection */
+      .inbox-layout {
+        position: relative;
+      }
+
+      .conv-panel {
+        width: 100%;
+        border-right: none;
+        box-shadow: none;
+      }
+
+      .thread-panel {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        background: var(--bg);
+        transform: translateX(100%);
+        transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: -8px 0 24px rgba(24,41,63,0.08);
+      }
+
+      /* Active thread view on mobile */
+      body.mobile-thread-view .thread-panel {
+        transform: translateX(0);
+      }
+
+      /* Hide the back button on desktop; show on mobile */
+      .btn-back { display: inline-flex; }
+
+      /* Thread header — tighter, fits the back button + name */
+      .thread-header {
+        padding: 11px 14px;
+        gap: 8px;
+      }
+      .thread-guest-name { font-size: 17px; }
+      .thread-identifier { display: none; }
+
+      /* Touch-friendlier conv items */
+      .conv-item { padding: 14px 16px; }
+
+      /* Filter bar */
+      .filter-bar { padding: 10px 12px 12px; }
+      .tab { padding: 7px 14px; font-size: 12px; }
+
+      /* Bubbles wider on mobile */
+      .msg-bubble { max-width: 84%; padding: 11px 15px; font-size: 14px; }
+      .messages-area { padding: 18px 14px; gap: 12px; }
+
+      /* Composer — pill-shaped textarea, compact actions */
+      .composer { padding: 12px 14px 14px; }
+      .composer-input {
+        min-height: 60px;
+        padding: 12px 14px;
+        font-size: 14px;
+      }
+      .composer-actions { margin-top: 10px; }
+      .btn-send { padding: 9px 20px; font-size: 13px; }
+      .btn-discard-draft { padding: 7px 12px; font-size: 11px; }
+      .composer-hint { display: none; }
+
+      /* Toast smaller and centered horizontally */
+      #toast {
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        text-align: center;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .brand-name { font-size: 17px; }
+      .thread-guest-name { font-size: 16px; }
+      .channel-badge { display: none; }
+      .btn-sm { padding: 5px 11px; font-size: 10.5px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="brand-name"><em>Aurora</em> AI</span>
+    <div class="brand-divider"></div>
+    <span class="brand-sub">Unified Inbox</span>
+  </div>
+  <div class="header-right">
+    <span id="conv-count"></span>
+    <a href="/" class="btn-link">Draft Review</a>
+  </div>
+</header>
+
+<div class="inbox-layout">
+
+  <!-- Left: conversation list -->
+  <aside class="conv-panel">
+    <div class="filter-bar">
+      <button class="tab active" data-filter="all">All</button>
+      <button class="tab" data-filter="whatsapp">WhatsApp</button>
+      <button class="tab" data-filter="email">Email</button>
+    </div>
+    <div class="conv-list" id="conv-list">
+      <div class="conv-empty">Loading…</div>
+    </div>
+  </aside>
+
+  <!-- Right: thread + composer -->
+  <main class="thread-panel">
+
+    <div class="thread-empty" id="thread-empty">
+      <div class="thread-empty-glyph">◎</div>
+      <div class="thread-empty-label">Select a conversation to reply</div>
+    </div>
+
+    <div class="thread-view" id="thread-view" style="display:none">
+      <div class="thread-header">
+        <button class="btn-back" id="btn-back" onclick="backToList()" aria-label="Back to conversations">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="thread-guest">
+          <span class="channel-badge" id="th-channel"></span>
+          <span class="thread-guest-name" id="th-name"></span>
+          <span class="thread-identifier" id="th-identifier"></span>
+          <span class="prop-chip" id="th-prop" style="display:none"></span>
+        </div>
+        <div class="thread-actions">
+          <button class="btn-sm" id="btn-resolve" onclick="toggleResolve()">Mark Resolved</button>
+        </div>
+      </div>
+
+      <div class="messages-area" id="messages-area"></div>
+      <button class="new-msg-badge" id="new-msg-badge" onclick="jumpToBottom()" style="display:none">
+        New message ↓
+      </button>
+
+      <div class="composer">
+        <div class="attach-preview" id="attach-preview" style="display:none">
+          <div class="attach-preview-inner" id="attach-preview-inner"></div>
+          <button class="attach-remove" onclick="clearAttachment()" title="Remove attachment">×</button>
+        </div>
+        <textarea
+          class="composer-input"
+          id="reply-input"
+          placeholder="Type a reply… (Cmd/Ctrl + Enter to send)"
+          rows="3"
+        ></textarea>
+        <div class="composer-actions">
+          <div class="composer-left">
+            <button class="btn-discard-draft" id="btn-discard-draft" style="display:none" onclick="discardDraft()">Discard AI Draft</button>
+            <span class="composer-hint" id="composer-hint"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <label class="btn-attach" id="btn-attach" title="Attach file" style="display:none">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              <input type="file" id="file-input" style="display:none" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip">
+            </label>
+            <button class="btn-send" id="btn-send" onclick="sendReply()">Send Reply →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────
+  let allConversations = []
+  let activeConvId     = null
+  let activeConv       = null
+  let activeFilter     = 'all'
+  let sending          = false
+  let toastTimer
+
+  // Attachment state
+  let pendingAttachment = null  // { key, filename, mime, size, previewUrl }
+
+  // Notification state
+  let notificationPermission   = 'default'
+  let hasInitialLoad           = false           // suppress notifications on first poll
+  const lastSeenAtByConvId     = new Map()       // conv_id → last_message_at (ISO)
+  const recentlySentConvIds    = new Set()       // suppress notif for our own sends
+
+  const convList     = document.getElementById('conv-list')
+  const convCount    = document.getElementById('conv-count')
+  const threadEmpty  = document.getElementById('thread-empty')
+  const threadView   = document.getElementById('thread-view')
+  const messagesArea = document.getElementById('messages-area')
+  const replyInput   = document.getElementById('reply-input')
+  const btnSend      = document.getElementById('btn-send')
+  const btnDiscard   = document.getElementById('btn-discard-draft')
+  const btnResolve   = document.getElementById('btn-resolve')
+  const newMsgBadge  = document.getElementById('new-msg-badge')
+  const toast        = document.getElementById('toast')
+
+  // ── Scroll helpers ─────────────────────────────────────────────────────
+  function isNearBottom() {
+    const { scrollTop, scrollHeight, clientHeight } = messagesArea
+    return scrollHeight - scrollTop - clientHeight < 100
+  }
+
+  function scrollToBottom() {
+    messagesArea.scrollTop = messagesArea.scrollHeight
+  }
+
+  function showBadge() { newMsgBadge.style.display = '' }
+  function hideBadge()  { newMsgBadge.style.display = 'none' }
+
+  function jumpToBottom() {
+    scrollToBottom()
+    hideBadge()
+  }
+
+  // Hide badge when user manually scrolls back to bottom
+  messagesArea.addEventListener('scroll', () => {
+    if (isNearBottom()) hideBadge()
+  }, { passive: true })
+
+  // ── Utilities ──────────────────────────────────────────────────────────
+  function esc(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+  }
+
+  function showToast(msg, isError = false) {
+    clearTimeout(toastTimer)
+    toast.textContent = msg
+    toast.className = isError ? 'show error' : 'show'
+    toastTimer = setTimeout(() => toast.className = '', 2800)
+  }
+
+  function relativeTime(iso) {
+    const diff = Date.now() - new Date(iso).getTime()
+    const m = Math.floor(diff / 60000)
+    const h = Math.floor(diff / 3600000)
+    const d = Math.floor(diff / 86400000)
+    if (m < 1)   return 'Just now'
+    if (m < 60)  return `${m}m`
+    if (h < 24)  return `${h}h`
+    if (d === 1) return 'Yesterday'
+    if (d < 7)   return `${d}d`
+    return new Date(iso).toLocaleDateString('en-GB', { day:'2-digit', month:'short' })
+  }
+
+  function fullTime(iso) {
+    const d = new Date(iso)
+    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short' })
+      + ' · ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })
+  }
+
+  function dateLabel(iso) {
+    const d   = new Date(iso)
+    const now = new Date()
+    if (d.toDateString() === now.toDateString()) return 'Today'
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1)
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
+    return d.toLocaleDateString('en-GB', { weekday:'long', day:'2-digit', month:'long' })
+  }
+
+  // Property display is derived from the router's slug, so the UI needs no
+  // knowledge of which properties exist. "demo-seaside-villas" → "Demo Seaside Villas".
+  const PROP_TONES = 4
+
+  function propSlugTone(property) {
+    if (!property || property === 'unknown') return 'unknown'
+    let hash = 0
+    for (const ch of property) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+    return `tone-${(hash % PROP_TONES) + 1}`
+  }
+
+  function propLabelFor(property) {
+    if (!property || property === 'unknown') return ''
+    return property.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  }
+
+  // ── Conversation list ──────────────────────────────────────────────────
+  function filteredConvs() {
+    if (activeFilter === 'all') return allConversations
+    return allConversations.filter(c => c.channel === activeFilter)
+  }
+
+  function renderConvList() {
+    const convs  = filteredConvs()
+    const pending = allConversations.filter(c => c.has_pending_draft && c.status !== 'resolved').length
+
+    convCount.innerHTML = pending
+      ? `<strong>${pending}</strong> pending draft${pending > 1 ? 's' : ''}`
+      : ''
+
+    if (!convs.length) {
+      convList.innerHTML = `<div class="conv-empty">No conversations yet.</div>`
+      return
+    }
+
+    convList.innerHTML = convs.map(c => {
+      const propSlug  = propSlugTone(c.property)
+      const propLabel = propLabelFor(c.property)
+      const isActive  = c.id === activeConvId
+      const isResolved = c.status === 'resolved'
+
+      return `
+        <div class="conv-item${isActive ? ' active' : ''}" onclick="selectConv('${c.id}')">
+          <div class="conv-item-top">
+            <span class="channel-badge ${c.channel}">${c.channel === 'whatsapp' ? 'WA' : '✉'}</span>
+            <span class="conv-name">${esc(c.guest_name || c.guest_identifier)}</span>
+            <span class="conv-time">${relativeTime(c.last_message_at)}</span>
+          </div>
+          <div class="conv-item-bottom">
+            <span class="conv-preview">${esc(c.last_message_preview || '—')}</span>
+            ${c.has_pending_draft && !isResolved ? '<span class="draft-dot"></span>' : ''}
+            ${propLabel ? `<span class="prop-chip ${propSlug}">${esc(propLabel)}</span>` : ''}
+            ${isResolved ? '<span class="resolved-badge">resolved</span>' : ''}
+          </div>
+        </div>`
+    }).join('')
+  }
+
+  // ── Select conversation ────────────────────────────────────────────────
+  async function selectConv(id) {
+    activeConvId = id
+    activeConv   = allConversations.find(c => c.id === id)
+    hideBadge()
+    renderConvList()
+    showThread()
+    document.body.classList.add('mobile-thread-view')   // slide in on mobile
+    await loadMessages()
+  }
+
+  // ── Back to conversation list (mobile) ────────────────────────────────
+  function backToList() {
+    document.body.classList.remove('mobile-thread-view')
+  }
+
+  function showThread() {
+    if (!activeConv) return
+    threadEmpty.style.display = 'none'
+    threadView.style.display  = 'flex'
+
+    const ch = document.getElementById('th-channel')
+    ch.textContent  = activeConv.channel === 'whatsapp' ? 'WA' : '✉'
+    ch.className    = `channel-badge ${activeConv.channel}`
+
+    document.getElementById('th-name').textContent = activeConv.guest_name || activeConv.guest_identifier
+    document.getElementById('th-identifier').textContent = activeConv.guest_name ? activeConv.guest_identifier : ''
+
+    const propEl = document.getElementById('th-prop')
+    const propSlug  = propSlugTone(activeConv.property)
+    const propLabel = propLabelFor(activeConv.property)
+    if (propLabel) {
+      propEl.textContent = propLabel
+      propEl.className   = `prop-chip ${propSlug}`
+      propEl.style.display = ''
+    } else {
+      propEl.style.display = 'none'
+    }
+
+    if (activeConv.status === 'resolved') {
+      btnResolve.textContent = 'Reopen'
+      btnResolve.className   = 'btn-sm'
+    } else {
+      btnResolve.textContent = 'Mark Resolved'
+      btnResolve.className   = 'btn-sm'
+    }
+
+    const channelLabel = activeConv.channel === 'whatsapp' ? 'WhatsApp' : 'Email'
+    document.getElementById('composer-hint').textContent = `Replying via ${channelLabel}`
+
+    // Attach button: WhatsApp only (email attachments need Gmail API — out of scope)
+    document.getElementById('btn-attach').style.display = activeConv.channel === 'whatsapp' ? 'inline-flex' : 'none'
+    clearAttachment()
+  }
+
+  // ── Messages ──────────────────────────────────────────────────────────
+  async function loadMessages() {
+    if (!activeConvId) return
+    try {
+      const res = await fetch(`/api/inbox/conversations/${activeConvId}/messages`)
+      if (!res.ok) throw new Error()
+      const messages = await res.json()
+      renderMessages(messages)
+    } catch {
+      // silent — already loaded in most cases
+    }
+  }
+
+  function formatFileSize(bytes) {
+    if (!bytes) return ''
+    if (bytes < 1024)             return `${bytes} B`
+    if (bytes < 1024 * 1024)      return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  // ── Email body helpers ────────────────────────────────────────────────
+  function isHtml(text) {
+    return /<[a-zA-Z][^>]*>/s.test(text)
+  }
+
+  // Split on URLs, escape everything else, wrap URLs in <a>
+  function linkifyText(raw) {
+    return raw.split(/(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g).map((part, i) =>
+      i % 2 === 1
+        ? `<a href="${esc(part)}" target="_blank" rel="noopener noreferrer">${esc(part)}</a>`
+        : esc(part)
+    ).join('')
+  }
+
+  function wrapEmailHtml(rawHtml) {
+    const base = `html,body{margin:0;padding:12px 14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:13.5px;line-height:1.65;color:#1c2e4a;word-break:break-word;}img{max-width:100%;height:auto;}a{color:#1664b0;}p{margin:0 0 10px;}p:last-child{margin-bottom:0;}blockquote{border-left:3px solid #e6e0d4;margin:0 0 10px;padding-left:10px;color:#5a6980;}pre,code{white-space:pre-wrap;word-break:break-word;font-size:12px;}table{max-width:100%;border-collapse:collapse;}*{box-sizing:border-box;}`
+    if (/<html[\s>]/i.test(rawHtml)) {
+      // Full document — inject our base styles before </head>
+      return /<\/head>/i.test(rawHtml)
+        ? rawHtml.replace(/<\/head>/i, `<style>${base}</style></head>`)
+        : rawHtml
+    }
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${base}</style></head><body>${rawHtml}</body></html>`
+  }
+
+  function resizeEmailFrame(iframe) {
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document
+      if (!doc) return
+      iframe.style.height = doc.documentElement.scrollHeight + 'px'
+    } catch {}
+  }
+
+  function renderMediaContent(m) {
+    if (!m.media_type || !m.media_signed_url) return ''
+    const url  = esc(m.media_signed_url)
+    const name = esc(m.media_filename || 'file')
+    const size = m.media_size ? formatFileSize(m.media_size) : ''
+
+    if (m.media_type === 'image') {
+      return `<img src="${url}" class="msg-img" onclick="openLightbox('${url}')" alt="${name}">`
+    }
+    if (m.media_type === 'video') {
+      return `<video src="${url}" controls class="msg-video" preload="metadata"></video>`
+    }
+    if (m.media_type === 'audio') {
+      return `<audio src="${url}" controls class="msg-audio"></audio>`
+    }
+    // document / generic file
+    return `<div class="msg-file-card">
+      <svg class="msg-file-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <div class="msg-file-info">
+        <span class="msg-file-name">${name}</span>
+        ${size ? `<span class="msg-file-size">${size}</span>` : ''}
+      </div>
+      <a href="${url}" download="${name}" target="_blank" class="msg-file-dl" onclick="event.stopPropagation()">↓</a>
+    </div>`
+  }
+
+  function renderMessages(messages) {
+    const visible = messages.filter(m => !(m.is_draft && m.draft_discarded))
+    let lastDate = null
+    let html = ''
+
+    for (const m of visible) {
+      const msgDate = new Date(m.created_at).toDateString()
+      if (msgDate !== lastDate) {
+        html += `<div class="date-divider"><span>${dateLabel(m.created_at)}</span></div>`
+        lastDate = msgDate
+      }
+
+      const isDraft    = m.is_draft && !m.draft_discarded
+      const rowClass   = m.direction === 'inbound' ? 'inbound' : (isDraft ? 'draft' : 'outbound')
+      const draftLabel = isDraft ? `<span class="draft-label">AI Draft</span><br>` : ''
+      const mediaHtml  = renderMediaContent(m)
+
+      let bodyHtml = ''
+      if (m.body) {
+        if (mediaHtml) {
+          // Caption below media — always plain
+          bodyHtml = `<div class="msg-caption">${esc(m.body)}</div>`
+        } else if (isHtml(m.body)) {
+          // HTML email — sandboxed iframe, auto-resizes on load
+          const srcdoc = wrapEmailHtml(m.body).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+          bodyHtml = `<iframe class="email-frame" sandbox="allow-same-origin" srcdoc="${srcdoc}" onload="resizeEmailFrame(this)"></iframe>`
+        } else {
+          // Plain text — linkified
+          bodyHtml = `<div class="msg-plain-text">${linkifyText(m.body)}</div>`
+        }
+      }
+
+      const bubbleClass = (!mediaHtml && m.body && isHtml(m.body))
+        ? 'msg-bubble msg-bubble-email'
+        : 'msg-bubble'
+
+      html += `
+        <div class="msg-row ${rowClass}">
+          <div class="msg-col">
+            <div class="${bubbleClass}">${draftLabel}${mediaHtml}${bodyHtml}</div>
+            <div class="msg-meta">${fullTime(m.created_at)}</div>
+          </div>
+        </div>`
+    }
+
+    if (!html) {
+      html = `<div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:12px;">No messages yet.</div>`
+    }
+
+    const wasAtBottom = isNearBottom()
+    const hadContent  = !!messagesArea.innerHTML.trim()
+
+    messagesArea.innerHTML = html
+
+    if (!hadContent || wasAtBottom) {
+      // First render OR user was already at bottom — follow new messages
+      scrollToBottom()
+      hideBadge()
+    } else {
+      // User scrolled up — show badge instead of forcing scroll
+      showBadge()
+    }
+
+    // Pre-fill composer with pending draft
+    const pendingDraft = visible.find(m => m.is_draft && !m.draft_discarded && m.direction === 'outbound')
+    if (pendingDraft) {
+      if (!replyInput.value || replyInput.dataset.lastDraftId !== pendingDraft.id) {
+        replyInput.value = pendingDraft.body
+        replyInput.dataset.lastDraftId = pendingDraft.id
+      }
+      btnDiscard.style.display = ''
+    } else {
+      if (replyInput.dataset.lastDraftId) {
+        // Draft was just discarded — clear if still showing draft text
+        replyInput.dataset.lastDraftId = ''
+        if (replyInput.value === (visible.find(m => m.is_draft) || {}).body) {
+          replyInput.value = ''
+        }
+      }
+      btnDiscard.style.display = 'none'
+    }
+  }
+
+  // ── Lightbox ───────────────────────────────────────────────────────────
+  function openLightbox(url) {
+    const lb = document.createElement('div')
+    lb.className = 'lightbox'
+    lb.onclick   = () => lb.remove()
+    lb.innerHTML = `
+      <img src="${url}" alt="Media" onclick="event.stopPropagation()">
+      <button class="lightbox-close" onclick="event.stopPropagation();this.parentNode.remove()">×</button>`
+    document.body.appendChild(lb)
+  }
+
+  // ── Attachment handling ────────────────────────────────────────────────
+  function showAttachPreview() {
+    if (!pendingAttachment) return
+    const { filename, mime, size, previewUrl } = pendingAttachment
+    const inner = document.getElementById('attach-preview-inner')
+
+    const thumbHtml = previewUrl
+      ? `<img class="attach-thumb" src="${previewUrl}" alt="">`
+      : `<div class="attach-icon">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+         </div>`
+
+    inner.innerHTML = `
+      ${thumbHtml}
+      <div class="attach-meta">
+        <span class="attach-name">${esc(filename)}</span>
+        <span class="attach-size">${formatFileSize(size)}</span>
+      </div>`
+
+    document.getElementById('attach-preview').style.display = 'flex'
+  }
+
+  function clearAttachment() {
+    pendingAttachment = null
+    document.getElementById('attach-preview').style.display = 'none'
+    document.getElementById('attach-preview-inner').innerHTML = ''
+    const fi = document.getElementById('file-input')
+    if (fi) fi.value = ''
+  }
+
+  document.getElementById('file-input').addEventListener('change', async function () {
+    const file = this.files[0]
+    if (!file) return
+
+    const btnAttach = document.getElementById('btn-attach')
+    btnAttach.classList.add('uploading')
+
+    // Show placeholder while uploading
+    document.getElementById('attach-preview').style.display = 'flex'
+    document.getElementById('attach-preview-inner').innerHTML =
+      `<span style="color:var(--text-muted);font-size:12px;padding:4px 0">Uploading…</span>`
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const res = await fetch('/api/inbox/upload', { method: 'POST', body: formData })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      pendingAttachment = {
+        key:        data.key,
+        filename:   data.filename,
+        mime:       data.mime,
+        size:       data.size,
+        previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+      }
+      showAttachPreview()
+    } catch {
+      clearAttachment()
+      showToast('File upload failed — please try again', true)
+    } finally {
+      btnAttach.classList.remove('uploading')
+      this.value = ''
+    }
+  })
+
+  // ── Send reply ─────────────────────────────────────────────────────────
+  async function sendReply() {
+    if (sending || !activeConvId) return
+    const body = replyInput.value.trim()
+    if (!body && !pendingAttachment) return
+
+    sending = true
+    btnSend.disabled = true
+
+    // Optimistic bubble
+    const optimisticId = 'opt-' + Date.now()
+    const optRow = document.createElement('div')
+    optRow.className = 'msg-row outbound'
+    optRow.id        = optimisticId
+    optRow.innerHTML = `
+      <div class="msg-col" style="align-items:flex-end">
+        <div class="msg-bubble" style="opacity:0.6">${esc(body)}</div>
+        <div class="msg-meta">Sending…</div>
+      </div>`
+    messagesArea.appendChild(optRow)
+    scrollToBottom()
+    hideBadge()
+
+    try {
+      const payload = { body }
+      if (pendingAttachment) {
+        payload.mediaKey      = pendingAttachment.key
+        payload.mediaFilename = pendingAttachment.filename
+        payload.mediaMime     = pendingAttachment.mime
+        payload.mediaSize     = pendingAttachment.size
+      }
+
+      const res = await fetch(`/api/inbox/conversations/${activeConvId}/reply`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || 'Send failed')
+
+      replyInput.value = ''
+      replyInput.dataset.lastDraftId = ''
+      btnDiscard.style.display = 'none'
+      clearAttachment()
+
+      // Suppress notification for our own send (auto-cleared after 15s)
+      recentlySentConvIds.add(activeConvId)
+      setTimeout(() => recentlySentConvIds.delete(activeConvId), 15000)
+
+      // Reload messages to get the real saved message
+      await loadMessages()
+      // Remove optimistic bubble (loadMessages already rendered real one)
+      document.getElementById(optimisticId)?.remove()
+
+      // Update conversation list preview
+      await loadConversations()
+      showToast('Message sent')
+    } catch (err) {
+      document.getElementById(optimisticId)?.remove()
+      showToast(err.message || 'Send failed — please try again', true)
+    } finally {
+      sending = false
+      btnSend.disabled = false
+    }
+  }
+
+  // ── Discard draft ──────────────────────────────────────────────────────
+  async function discardDraft() {
+    if (!activeConvId) return
+    try {
+      const res = await fetch(`/api/inbox/conversations/${activeConvId}/draft`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      replyInput.value = ''
+      replyInput.dataset.lastDraftId = ''
+      btnDiscard.style.display = 'none'
+      await loadMessages()
+      await loadConversations()
+      showToast('AI draft discarded')
+    } catch {
+      showToast('Could not discard draft', true)
+    }
+  }
+
+  // ── Resolve / Reopen ──────────────────────────────────────────────────
+  async function toggleResolve() {
+    if (!activeConv) return
+    const newStatus = activeConv.status === 'resolved' ? 'open' : 'resolved'
+    try {
+      const res = await fetch(`/api/inbox/conversations/${activeConvId}/status`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ status: newStatus }),
+      })
+      if (!res.ok) throw new Error()
+      showToast(newStatus === 'resolved' ? 'Conversation resolved' : 'Reopened')
+      await loadConversations()
+      activeConv = allConversations.find(c => c.id === activeConvId)
+      showThread()
+    } catch {
+      showToast('Could not update status', true)
+    }
+  }
+
+  // ── Filter tabs ────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+      tab.classList.add('active')
+      activeFilter = tab.dataset.filter
+      renderConvList()
+    })
+  })
+
+  // ── Keyboard shortcut ─────────────────────────────────────────────────
+  replyInput.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault()
+      sendReply()
+    }
+  })
+
+  // ── Browser notifications ─────────────────────────────────────────────
+  async function initNotifications() {
+    if (!('Notification' in window)) return
+    notificationPermission = Notification.permission
+    if (notificationPermission === 'default') {
+      try { notificationPermission = await Notification.requestPermission() }
+      catch { /* user dismissed */ }
+    }
+  }
+
+  function detectNewMessages(newConvs) {
+    // First load — establish baseline silently
+    if (!hasInitialLoad) {
+      for (const c of newConvs) lastSeenAtByConvId.set(c.id, c.last_message_at)
+      hasInitialLoad = true
+      return
+    }
+
+    for (const c of newConvs) {
+      const prev    = lastSeenAtByConvId.get(c.id)
+      const isNew   = !prev
+      const updated = prev && c.last_message_at > prev
+
+      if ((isNew || updated) && !recentlySentConvIds.has(c.id)) {
+        const tabFocused   = document.hasFocus()
+        const isActiveConv = c.id === activeConvId
+        // Suppress only when the user is actively looking at this conversation
+        if (!(tabFocused && isActiveConv)) fireNotification(c)
+      }
+
+      lastSeenAtByConvId.set(c.id, c.last_message_at)
+    }
+  }
+
+  function fireNotification(conv) {
+    if (notificationPermission !== 'granted') return
+
+    const channel = conv.channel === 'whatsapp' ? 'WhatsApp' : 'Email'
+    const title   = `${conv.guest_name || conv.guest_identifier} · ${channel}`
+    const body    = conv.last_message_preview || 'New message'
+
+    try {
+      const notif = new Notification(title, {
+        body,
+        tag:  `inbox-${conv.id}`,  // de-dupe across rapid polls
+        icon: '/favicon.ico',
+      })
+      notif.onclick = () => {
+        window.focus()
+        selectConv(conv.id)
+        notif.close()
+      }
+    } catch (err) {
+      console.warn('Notification failed:', err.message)
+    }
+  }
+
+  // ── Polling ────────────────────────────────────────────────────────────
+  async function loadConversations() {
+    try {
+      const res = await fetch('/api/inbox/conversations')
+      if (!res.ok) throw new Error()
+      const newConvs = await res.json()
+      detectNewMessages(newConvs)
+      allConversations = newConvs
+      // Keep active conv updated
+      if (activeConvId) activeConv = allConversations.find(c => c.id === activeConvId) || activeConv
+      renderConvList()
+    } catch {
+      if (!allConversations.length) {
+        convList.innerHTML = `<div class="conv-empty">Could not load conversations.</div>`
+      }
+    }
+  }
+
+  // Initial load
+  initNotifications()
+  loadConversations()
+
+  // Poll conversations every 5 s
+  setInterval(loadConversations, 5000)
+
+  // Poll active thread messages every 5 s
+  setInterval(() => {
+    if (activeConvId) loadMessages()
+  }, 5000)
+</script>
+</body>
+</html>

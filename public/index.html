@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Concierge — Draft Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:             #0c0c0c;
+      --surface:        #161616;
+      --surface-2:      #1e1e1e;
+      --border:         #262626;
+      --text:           #ede9e3;
+      --text-secondary: #787068;
+      --text-muted:     #3d3935;
+      --amber:          #c8a97e;
+      --amber-hover:    #dbbf95;
+      --radius:         10px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ─────────────────────────────── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(12, 12, 12, 0.9);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .brand-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 21px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .brand-name em {
+      color: var(--amber);
+      font-style: normal;
+    }
+
+    .brand-divider {
+      width: 1px;
+      height: 14px;
+      background: var(--border);
+    }
+
+    .brand-sub {
+      font-size: 10.5px;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    #pending-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    #pending-badge strong {
+      color: var(--amber);
+      font-weight: 500;
+    }
+
+    .btn-refresh {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      background: transparent;
+      border: 1px solid var(--border);
+      padding: 5px 13px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .btn-refresh:hover { border-color: var(--text-muted); color: var(--text); }
+
+    /* ── Main ───────────────────────────────── */
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 36px 24px 72px;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 22px;
+    }
+
+    /* ── Cards ──────────────────────────────── */
+    #drafts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .draft-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.2s, opacity 0.3s;
+    }
+
+    .draft-card:hover { border-color: #333; }
+
+    /* Card header row */
+    .card-meta {
+      padding: 12px 18px;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .meta-left {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .sender-name {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .sender-phone {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .prop-tag {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* Property tags are assigned a tone by slug hash — no property is hardcoded,
+       so adding a property to knowledge_base/ needs no change here. */
+    .tag-tone-1  { background: rgba(68, 110, 68, 0.18);  color: #82c088; }
+    .tag-tone-2  { background: rgba(55, 90, 145, 0.2);   color: #7aaedd; }
+    .tag-tone-3  { background: rgba(102, 78, 140, 0.22); color: #b79ae0; }
+    .tag-tone-4  { background: rgba(140, 100, 50, 0.22); color: #d9a86a; }
+    .tag-unknown { background: rgba(70, 70, 70, 0.2);    color: #9a9a9a; }
+
+    .card-time {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* Two-column message / draft layout */
+    .card-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .col {
+      padding: 18px 20px;
+    }
+
+    .col:first-child {
+      border-right: 1px solid var(--border);
+    }
+
+    .col-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .col-text {
+      font-size: 13.5px;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .draft-col .col-text {
+      color: #dcd7cf;
+    }
+
+    /* Action row */
+    .card-actions {
+      padding: 11px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 7px 16px;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
+    }
+
+    button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .btn-send {
+      background: var(--amber);
+      color: #0c0c0c;
+    }
+
+    .btn-send:hover:not(:disabled) { background: var(--amber-hover); }
+
+    .btn-discard {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-discard:hover:not(:disabled) {
+      background: rgba(180, 55, 55, 0.14);
+      color: #c97070;
+      border-color: rgba(180, 55, 55, 0.3);
+    }
+
+    /* ── Empty / Error States ───────────────── */
+    .state-block {
+      text-align: center;
+      padding: 88px 20px;
+    }
+
+    .state-glyph {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 36px;
+      font-weight: 400;
+      color: var(--border);
+      margin-bottom: 16px;
+      line-height: 1;
+    }
+
+    .state-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .state-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ── Toast ──────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(6px);
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 100;
+    }
+
+    #toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="brand-name">AI <em>Concierge</em></span>
+    <div class="brand-divider"></div>
+    <span class="brand-sub">WhatsApp Draft Review</span>
+  </div>
+  <div class="header-right">
+    <span id="pending-badge"></span>
+    <button class="btn-refresh" onclick="loadDrafts()">Refresh</button>
+  </div>
+</header>
+
+<main>
+  <div class="section-label">Pending drafts</div>
+  <div id="drafts-list">
+    <div class="state-block">
+      <div class="state-glyph">◌</div>
+      <div class="state-sub">Loading…</div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  const list   = document.getElementById('drafts-list')
+  const badge  = document.getElementById('pending-badge')
+  const toast  = document.getElementById('toast')
+  let toastTimer
+
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  }
+
+  function showToast(msg) {
+    clearTimeout(toastTimer)
+    toast.textContent = msg
+    toast.classList.add('show')
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2800)
+  }
+
+  function formatTime(iso) {
+    const d = new Date(iso)
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+      + ' · '
+      + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  // Property display is derived from the router's slug, so the UI needs no
+  // knowledge of which properties exist. "demo-seaside-villas" → "Demo Seaside Villas".
+  const TAG_TONES = 4
+
+  function tagClassFor(property) {
+    if (!property || property === 'unknown') return 'tag-unknown'
+    let hash = 0
+    for (const ch of property) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+    return `tag-tone-${(hash % TAG_TONES) + 1}`
+  }
+
+  function tagLabelFor(property) {
+    if (!property || property === 'unknown') return 'Unknown'
+    return property.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  }
+
+  function renderDrafts(drafts) {
+    if (!drafts.length) {
+      badge.innerHTML = ''
+      list.innerHTML = `
+        <div class="state-block">
+          <div class="state-glyph">◎</div>
+          <div class="state-title">All clear</div>
+          <div class="state-sub">No pending drafts right now.</div>
+        </div>`
+      return
+    }
+
+    badge.innerHTML = `<strong>${drafts.length}</strong> pending`
+
+    list.innerHTML = drafts.map(d => `
+      <div class="draft-card" id="card-${d.id}">
+        <div class="card-meta">
+          <div class="meta-left">
+            <span class="sender-name">${esc(d.senderName)}</span>
+            <span class="sender-phone">${esc(d.sender)}</span>
+            <span class="prop-tag ${tagClassFor(d.property)}">${tagLabelFor(d.property)}</span>
+          </div>
+          <span class="card-time">${formatTime(d.createdAt)}</span>
+        </div>
+        <div class="card-columns">
+          <div class="col">
+            <div class="col-label">Guest message</div>
+            <div class="col-text">${esc(d.originalMessage)}</div>
+          </div>
+          <div class="col draft-col">
+            <div class="col-label">Draft reply</div>
+            <div class="col-text">${esc(d.draftReply)}</div>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="btn-discard" onclick="handleDiscard('${d.id}')">Discard</button>
+          <button class="btn-send"    onclick="handleSend('${d.id}')">Send →</button>
+        </div>
+      </div>
+    `).join('')
+  }
+
+  async function loadDrafts() {
+    try {
+      const res = await fetch('/api/drafts')
+      if (!res.ok) throw new Error()
+      renderDrafts(await res.json())
+    } catch {
+      list.innerHTML = `
+        <div class="state-block">
+          <div class="state-glyph">—</div>
+          <div class="state-sub">Could not load drafts — check server logs.</div>
+        </div>`
+    }
+  }
+
+  async function handleSend(id) {
+    const card = document.getElementById(`card-${id}`)
+    card.querySelectorAll('button').forEach(b => b.disabled = true)
+    try {
+      const res = await fetch(`/api/drafts/${id}/send`, { method: 'POST' })
+      if (!res.ok) throw new Error()
+      card.style.opacity = '0.35'
+      setTimeout(() => { card.remove(); loadDrafts() }, 380)
+      showToast('Message sent ✓')
+    } catch {
+      card.querySelectorAll('button').forEach(b => b.disabled = false)
+      showToast('Send failed — please try again')
+    }
+  }
+
+  async function handleDiscard(id) {
+    const card = document.getElementById(`card-${id}`)
+    card.querySelectorAll('button').forEach(b => b.disabled = true)
+    try {
+      const res = await fetch(`/api/drafts/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      card.style.opacity = '0.35'
+      setTimeout(() => { card.remove(); loadDrafts() }, 380)
+      showToast('Draft discarded')
+    } catch {
+      card.querySelectorAll('button').forEach(b => b.disabled = false)
+      showToast('Discard failed — please try again')
+    }
+  }
+
+  loadDrafts()
+  setInterval(loadDrafts, 30000) // Auto-refresh every 30 seconds
+</script>
+</body>
+</html>
