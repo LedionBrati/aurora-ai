@@ -2,13 +2,20 @@ require('dotenv').config()
 const express = require('express')
 const path = require('path')
 const logger = require('./utils/logger')
+const { requireAuth, assertAuthConfigured } = require('./middleware/auth')
 
 const app = express()
 const PORT = process.env.PORT || 3000
 
+// Fail fast if the dashboard has no credentials — see middleware/auth.js
+assertAuthConfigured()
+
 // Preserve raw body buffer for webhook signature verification
 app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf } }))
-app.use(express.static(path.join(__dirname, '../public')))
+
+// ── Public surface ────────────────────────────────────────────────────────
+// Only these three. Webhooks authenticate themselves by HMAC signature, since
+// 360dialog and Google Pub/Sub cannot send Basic credentials.
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'AI Concierge', timestamp: new Date().toISOString() })
@@ -16,8 +23,16 @@ app.get('/health', (_req, res) => {
 
 app.use('/webhook/whatsapp', require('./routes/whatsapp'))
 app.use('/webhook/gmail',   require('./routes/gmail'))        // Dormant locally — active on Railway via Pub/Sub
-app.use('/api',             require('./routes/dashboard'))
-app.use('/api/inbox',       require('./routes/inbox'))
+
+// ── Everything below this line requires authentication ────────────────────
+// Note express.static sits *after* the gate on purpose: mounted above it, it
+// would serve index.html and inbox.html to anyone before any route ran.
+
+app.use(requireAuth)
+
+app.use(express.static(path.join(__dirname, '../public')))
+app.use('/api',       require('./routes/dashboard'))
+app.use('/api/inbox', require('./routes/inbox'))
 
 app.get('/inbox', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/inbox.html'))

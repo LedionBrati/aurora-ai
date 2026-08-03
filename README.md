@@ -78,6 +78,7 @@ Fill in `.env` — it is gitignored and must never be committed:
 | `GMAIL_REFRESH_TOKEN` | run `node scripts/get-refresh-token.js` |
 | `GMAIL_USER_EMAIL` | the mailbox to monitor |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | Supabase project settings |
+| `DASHBOARD_USER` / `DASHBOARD_PASSWORD` | **you choose** — protects the inbox; app won't start without them |
 
 `SUPABASE_SERVICE_KEY` is the **service role** key — it bypasses row-level security.
 Server-side only. Never expose it to the browser.
@@ -114,6 +115,8 @@ npm start       # plain node
 ```
 
 Inbox at `http://localhost:3000/inbox`, drafts dashboard at `http://localhost:3000`.
+The browser will prompt for your `DASHBOARD_USER` / `DASHBOARD_PASSWORD` once, then
+carry the credentials on every subsequent request automatically.
 
 For WhatsApp webhooks against localhost:
 
@@ -126,23 +129,55 @@ Gmail polls locally — no tunnel needed.
 
 ---
 
-## ⚠️ Security status
+## 🔒 Security
 
-This runs locally today. **Two things must be fixed before it is exposed to the internet:**
+### Authentication
 
-1. **There is no authentication.** `/inbox`, `/api/*`, and `/api/inbox/*` are wide open.
-   Anyone who reaches the URL can read every guest conversation and send WhatsApp
-   messages as the business. Put auth in front of the dashboard and API routes before
-   deploying — the webhook routes under `/webhook/*` are the only ones meant to be public.
+Exactly three routes are public. Everything else requires HTTP Basic credentials
+(`DASHBOARD_USER` / `DASHBOARD_PASSWORD`):
 
-2. **Webhook verification fails open.** `src/routes/whatsapp.js` only checks the HMAC
-   signature when `WHATSAPP_WEBHOOK_SECRET` is set. If the variable is missing in
-   production, unsigned requests are accepted. Set the secret, and make a missing secret
-   a hard startup failure rather than a silent skip.
+| Route | Access |
+|---|---|
+| `GET /health` | public — liveness only, leaks nothing |
+| `POST /webhook/whatsapp` | public — authenticated by HMAC signature |
+| `POST /webhook/gmail` | public — authenticated by Google Pub/Sub |
+| `GET /`, `GET /inbox` | **Basic auth** |
+| `/index.html`, `/inbox.html` (static) | **Basic auth** |
+| `GET/POST/DELETE /api/*` | **Basic auth** |
 
-Handled correctly already: secrets live only in `.env`; guest data in `data/` is
-gitignored; the Supabase service key is server-side only; no guest data is hardcoded
-anywhere in the source.
+The gate is a single `app.use(requireAuth)` in `src/server.js`. `express.static` is
+mounted *below* it deliberately — above it, the dashboard HTML would be served to anyone
+before any route ran.
+
+Both webhook paths stay open because 360dialog and Google Pub/Sub cannot send Basic
+credentials; they prove themselves by signature instead.
+
+### Fails closed, never open
+
+- **No dashboard credentials → the process refuses to start.** A missing password can
+  never silently degrade into "no auth". It prints a freshly generated password to use.
+- **`DASHBOARD_PASSWORD` under 16 characters → refuses to start.**
+- **No `WHATSAPP_WEBHOOK_SECRET` → the WhatsApp webhook returns 503.** It does not fall
+  back to accepting unsigned payloads. Set the secret from the 360dialog Hub, or the
+  channel stays closed.
+- Credentials are compared with `crypto.timingSafeEqual` over SHA-256 digests, and both
+  username and password are always evaluated so a wrong username costs the same time as
+  a wrong password.
+
+### Secrets and client data
+
+- All keys live in `.env`, which is gitignored (`.env.*` too, except `.env.example`).
+- `SUPABASE_SERVICE_KEY` is the **service role** key — it bypasses row-level security.
+  Server-side only; it is never sent to the browser.
+- Guest data in `data/` is gitignored. No guest data is hardcoded anywhere in the source.
+- Real property knowledge bases and the two client-specific prompt files are gitignored —
+  see "Configuring your properties" above.
+
+### Before deploying
+
+Basic auth over **plain HTTP sends the password in base64, which is not encryption**.
+Terminate TLS in front of this app (any managed host does so by default). Consider also
+adding rate limiting on the 401 path if the dashboard is exposed to the open internet.
 
 ---
 
@@ -150,7 +185,9 @@ anywhere in the source.
 
 ```
 src/
-  server.js              Express app, static hosting, Gmail poll loop
+  server.js              Express app, auth gate, static hosting, Gmail poll loop
+  middleware/
+    auth.js              HTTP Basic gate + fail-closed startup checks
   routes/
     whatsapp.js          360dialog webhook → filter → route → draft
     gmail.js             Gmail message processing (polled or Pub/Sub)

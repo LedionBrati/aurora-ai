@@ -1,8 +1,10 @@
 {
   "name": "ai-concierge",
   "version": "1.0.0",
-  "description": "AI guest messaging agent for Santorini short-term rental properties",
+  "description": "AI guest messaging agent for short-term rental properties",
   "main": "src/server.js",
+  "license": "MIT",
+  "author": "Ledion Brati",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js"

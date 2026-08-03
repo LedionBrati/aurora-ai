@@ -11,13 +11,20 @@ const logger = require('../utils/logger')
 const FALLBACK = 'Thank you for reaching out! One of our team will get back to you shortly.'
 
 router.post('/', (req, res) => {
-  if (process.env.WHATSAPP_WEBHOOK_SECRET) {
-    const sig = req.headers['x-hub-signature-256'] || req.headers['x-360dialog-signature'] || ''
-    if (!verifySignature(req.rawBody, sig)) {
-      logger.warn('WhatsApp: invalid webhook signature — rejected')
-      return res.sendStatus(403)
-    }
+  // Fails closed. This endpoint must stay publicly reachable for 360dialog, so the
+  // HMAC signature is the only thing standing between the pipeline and forged
+  // messages. A missing secret is a misconfiguration, never a reason to skip the check.
+  if (!process.env.WHATSAPP_WEBHOOK_SECRET) {
+    logger.error('WhatsApp: WHATSAPP_WEBHOOK_SECRET is not set — rejecting webhook')
+    return res.sendStatus(503)
   }
+
+  const sig = req.headers['x-hub-signature-256'] || req.headers['x-360dialog-signature'] || ''
+  if (!verifySignature(req.rawBody, sig)) {
+    logger.warn('WhatsApp: invalid webhook signature — rejected')
+    return res.sendStatus(403)
+  }
+
   res.sendStatus(200)
   processPayload(req.body).catch(err => logger.error('WhatsApp payload error', err.message))
 })
