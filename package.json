@@ -4,7 +4,7 @@
   "description": "AI guest messaging agent for short-term rental properties",
   "main": "src/server.js",
   "license": "MIT",
-  "author": "Ledion Brati",
+  "author": "Ledi Brati",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js"
