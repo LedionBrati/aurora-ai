@@ -1,214 +1,78 @@
-# Aurora AI — Guest Messaging Concierge
+# Aurora AI
 
-An AI concierge for short-term rental hosts. It watches WhatsApp and Gmail for guest
-messages, filters out spam, works out which property the guest is asking about, and
-drafts a reply grounded in that property's knowledge base.
+An AI concierge for holiday rental hosts. It reads guest messages from WhatsApp and Gmail and drafts a reply for the host to check and send.
 
-**Every reply is a draft.** Nothing is ever sent to a guest automatically — the host
-reviews, edits, and presses send from a unified inbox.
+## Why I built it
 
----
+I grew up in Santorini, and I build AI tools for hospitality businesses there.
+
+Small hosts with a few properties answer the same guest questions all day, across WhatsApp and email. Check-in time, parking, how to get from the port. Most of the answers already exist somewhere, in the host's head or in a doc.
+
+I wanted an agent that does the first draft, while the host stays in control.
+
+So the one rule is: **every reply is a draft.** Nothing is ever sent to a guest automatically. The host reads it, edits it, and presses send.
 
 ## How it works
 
 ```
-  WhatsApp (360dialog webhook)  ─┐
-                                 ├─►  1. FILTER   real guest, or spam/B2B/scam?
-  Gmail (polling / Pub/Sub)     ─┘         │
-                                           ▼
-                                     2. ROUTE     which property is this about?
-                                           │
-                                           ▼
-                                     3. DRAFT     reply grounded in that
-                                           │      property's knowledge base
-                                           ▼
-                                     Supabase  ──►  Unified inbox (host reviews)
-                                                            │
-                                                            ▼
-                                                   Host edits and sends
+WhatsApp ─┐
+          ├─► 1. FILTER  is this a real guest, or spam / sales / scam?
+Gmail ────┘        ↓
+              2. ROUTE   which property is it about?
+                   ↓
+              3. DRAFT   write a reply using that property's info
+                   ↓
+              Inbox      the host reviews, edits, sends
 ```
 
-Each stage is a separate LLM call with its own prompt file in `prompts/`, so you can
-tune one stage without touching the others.
+Each step is its own small LLM call (OpenAI `gpt-4o`) with its own prompt file in `prompts/`. So I can fix one step without touching the others.
 
-| Stage | Prompt | Output |
-|---|---|---|
-| Filter | `prompts/filter-prompt.txt` | `REAL_GUEST` / `NOT_GUEST` + confidence |
-| Route | `prompts/router-prompt.txt` | property slug + confidence |
-| Draft | `prompts/draft-prompt.txt` + `system-prompt.txt` | ready-to-send message text |
+Each property has a markdown file in `knowledge_base/` with its rules, directions and FAQs. The router picks a property, and the drafter only gets that property's file.
 
-The router's `property` value must match a filename in `knowledge_base/` — returning
-`"demo-seaside-villas"` loads `knowledge_base/demo-seaside-villas.md`.
+Everything is saved in Supabase and shows up in one inbox page for both channels.
 
----
+## Key decisions
 
-## Stack
+- **Drafts, not auto-replies.** A wrong answer to a guest costs a host more than a slow one. A human in the loop also means I can ship before the agent is perfect.
+- **Three small steps, not one big prompt.** Spam gets thrown out before any drafting happens, and when a draft is wrong I can see which step got it wrong.
+- **One file per property.** A host can edit a markdown file. No dashboard or database needed to teach the agent.
+- **Client data never goes in git.** The repo is public, but the real property files and two of the prompts are gitignored. Only `*.example.*` files are tracked.
+- **Fails closed.** The app won't start without a dashboard password of 16+ characters. If the WhatsApp webhook secret is missing, that webhook returns an error instead of accepting unsigned messages.
 
-- **Node.js + Express** — webhook receiver, JSON API, static inbox UI
-- **OpenAI `gpt-4o`** — filter, router, and drafting (`src/services/claude.js`)
-- **Supabase** — conversations, messages, drafts
-- **360dialog** — WhatsApp Business API, with HMAC webhook signature verification
-- **Gmail API (OAuth2)** — polls every 30s locally; Pub/Sub push in production
+## What I learned
 
----
+- **Public repos need a plan from day one.** Before making this repo public I found real property names hardcoded in the frontend. I rewrote it so the labels come from the data, and set up the gitignore so only example files can be committed.
+- **Security order matters.** In Express, if the static file server is mounted above the login check, the dashboard is public. One line in the wrong place.
+- **Never put secrets in what the AI reads.** If a door code is in the property file, the agent will happily give it to anyone who asks. The file should say *how* a guest gets the code, not the code.
+- **Splitting the agent into steps made it debuggable.** When something went wrong I could test one prompt on its own.
 
-## Setup
+## Run it
+
+You need an OpenAI key, a Supabase project, and optionally a 360dialog (WhatsApp) account and Gmail OAuth credentials.
 
 ```bash
 git clone https://github.com/LedionBrati/aurora-ai.git
 cd aurora-ai
 npm install
+cp .env.example .env    # fill in your keys and a dashboard password
+
+cp knowledge_base/demo-seaside-villas.example.md knowledge_base/demo-seaside-villas.md
+cp prompts/router-prompt.example.txt prompts/router-prompt.txt
+cp prompts/system-prompt.example.txt prompts/system-prompt.txt
+
+npm run dev
 ```
 
-### 1. Environment
+Then open `http://localhost:3000/inbox` and log in with your dashboard user and password.
 
-```bash
-cp .env.example .env
-```
+Gmail is checked every 30 seconds, no extra setup. For WhatsApp on localhost you need a tunnel like `npx ngrok http 3000`, then register that URL in 360dialog.
 
-Fill in `.env` — it is gitignored and must never be committed:
-
-| Variable | Where to get it |
-|---|---|
-| `OPENAI_API_KEY` | platform.openai.com |
-| `WHATSAPP_API_KEY` | 360dialog Hub |
-| `WHATSAPP_WEBHOOK_SECRET` | 360dialog Hub — **see the security note below** |
-| `WHATSAPP_PHONE_NUMBER_ID` | 360dialog Hub |
-| `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` | Google Cloud Console → OAuth2 credentials |
-| `GMAIL_REFRESH_TOKEN` | run `node scripts/get-refresh-token.js` |
-| `GMAIL_USER_EMAIL` | the mailbox to monitor |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | Supabase project settings |
-| `DASHBOARD_USER` / `DASHBOARD_PASSWORD` | **you choose** — protects the inbox; app won't start without them |
-
-`SUPABASE_SERVICE_KEY` is the **service role** key — it bypasses row-level security.
-Server-side only. Never expose it to the browser.
-
-### 2. Configuring your properties
-
-Real property content is deliberately kept out of git. Property knowledge bases contain
-house rules, access procedures, and sometimes staff names — client material that does not
-belong in a shared repo. `.gitignore` tracks only the `*.example.*` files.
-
-Copy each example and edit in place:
-
-```bash
-cp knowledge_base/demo-seaside-villas.example.md knowledge_base/your-property.md
-cp prompts/router-prompt.example.txt            prompts/router-prompt.txt
-cp prompts/system-prompt.example.txt            prompts/system-prompt.txt
-```
-
-Then list your real properties in `prompts/router-prompt.txt`, making sure each slug
-matches a `knowledge_base/<slug>.md` filename.
-
-> **Do not put door codes, WiFi passwords, or lockbox combinations in a knowledge base.**
-> The agent will repeat anything it finds there to a guest. Describe *how* the guest
-> receives the secret instead.
-
-The app reads all four prompt files at startup with `readFileSync`, so it will not boot
-until `router-prompt.txt` and `system-prompt.txt` exist.
-
-### 3. Run
-
-```bash
-npm run dev     # nodemon
-npm start       # plain node
-```
-
-Inbox at `http://localhost:3000/inbox`, drafts dashboard at `http://localhost:3000`.
-The browser will prompt for your `DASHBOARD_USER` / `DASHBOARD_PASSWORD` once, then
-carry the credentials on every subsequent request automatically.
-
-For WhatsApp webhooks against localhost:
-
-```bash
-npx ngrok http 3000
-# register https://<id>.ngrok-free.app/webhook/whatsapp in 360dialog Hub
-```
-
-Gmail polls locally — no tunnel needed.
-
----
-
-## 🔒 Security
-
-### Authentication
-
-Exactly three routes are public. Everything else requires HTTP Basic credentials
-(`DASHBOARD_USER` / `DASHBOARD_PASSWORD`):
-
-| Route | Access |
-|---|---|
-| `GET /health` | public — liveness only, leaks nothing |
-| `POST /webhook/whatsapp` | public — authenticated by HMAC signature |
-| `POST /webhook/gmail` | public — authenticated by Google Pub/Sub |
-| `GET /`, `GET /inbox` | **Basic auth** |
-| `/index.html`, `/inbox.html` (static) | **Basic auth** |
-| `GET/POST/DELETE /api/*` | **Basic auth** |
-
-The gate is a single `app.use(requireAuth)` in `src/server.js`. `express.static` is
-mounted *below* it deliberately — above it, the dashboard HTML would be served to anyone
-before any route ran.
-
-Both webhook paths stay open because 360dialog and Google Pub/Sub cannot send Basic
-credentials; they prove themselves by signature instead.
-
-### Fails closed, never open
-
-- **No dashboard credentials → the process refuses to start.** A missing password can
-  never silently degrade into "no auth". It prints a freshly generated password to use.
-- **`DASHBOARD_PASSWORD` under 16 characters → refuses to start.**
-- **No `WHATSAPP_WEBHOOK_SECRET` → the WhatsApp webhook returns 503.** It does not fall
-  back to accepting unsigned payloads. Set the secret from the 360dialog Hub, or the
-  channel stays closed.
-- Credentials are compared with `crypto.timingSafeEqual` over SHA-256 digests, and both
-  username and password are always evaluated so a wrong username costs the same time as
-  a wrong password.
-
-### Secrets and client data
-
-- All keys live in `.env`, which is gitignored (`.env.*` too, except `.env.example`).
-- `SUPABASE_SERVICE_KEY` is the **service role** key — it bypasses row-level security.
-  Server-side only; it is never sent to the browser.
-- Guest data in `data/` is gitignored. No guest data is hardcoded anywhere in the source.
-- Real property knowledge bases and the two client-specific prompt files are gitignored —
-  see "Configuring your properties" above.
-
-### Before deploying
-
-Basic auth over **plain HTTP sends the password in base64, which is not encryption**.
-Terminate TLS in front of this app (any managed host does so by default). Consider also
-adding rate limiting on the 401 path if the dashboard is exposed to the open internet.
-
----
-
-## Project layout
-
-```
-src/
-  server.js              Express app, auth gate, static hosting, Gmail poll loop
-  middleware/
-    auth.js              HTTP Basic gate + fail-closed startup checks
-  routes/
-    whatsapp.js          360dialog webhook → filter → route → draft
-    gmail.js             Gmail message processing (polled or Pub/Sub)
-    inbox.js             JSON API for the unified inbox
-    dashboard.js         JSON API for the drafts dashboard
-  services/
-    claude.js            The three LLM calls (OpenAI gpt-4o)
-    knowledgeBase.js     Loads knowledge_base/<slug>.md
-    supabase.js          Conversation + message + draft persistence
-    whatsapp.js          Outbound WhatsApp sending
-    gmail.js             Gmail API read/send
-    media.js             Image and attachment handling
-  utils/logger.js
-prompts/                 One file per LLM stage
-knowledge_base/          One markdown file per property (real ones gitignored)
-public/                  index.html (drafts) and inbox.html (unified inbox)
-scripts/                 get-refresh-token.js — one-off Gmail OAuth helper
-```
-
----
+`node scripts/get-refresh-token.js` gets you a Gmail refresh token.
 
 ## Status
 
-Working prototype, run locally against live mailboxes. Not deployed.
+Working prototype, tested only with demo data. It has never been connected to a real guest inbox, and it is not deployed.
+
+Next on my list: retrieval instead of putting the whole property file in the prompt, and a voice channel. I've started a voice demo locally, it's not in this repo yet.
+
+MIT licensed.
